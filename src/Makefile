@@ -1,6 +1,7 @@
 INC="./inc"
 FLAGS=-I$(INC)
 CC=nvcc
+mpi=mpicc
 
 all: serialNeuralNet cudaNeuralNet MPINeuralNet run clean
 
@@ -11,7 +12,7 @@ cudaNeuralNet: cudaNeuralNet.cu
 	$(CC) cudaNeuralNet.cu -o cudaNeuralNet.out
 
 MPINeuralNet: MPINeuralNet.cu
-	$(CC) MPINeuralNet.cu -o MPINeuralNet.out
+	$(mpi) MPINeuralNet.cu -o MPINeuralNet.out
 
 run:
 	# srun -N1 ./serialNeuralNet.out
