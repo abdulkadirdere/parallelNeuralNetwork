@@ -11,8 +11,8 @@ serialNeuralNet: serialNeuralNet.cu
 cudaNeuralNet: cudaNeuralNet.cu
 	$(CC) cudaNeuralNet.cu -o cudaNeuralNet.out
 
-MPINeuralNet: MPINeuralNet.cu
-	$(mpi) MPINeuralNet.cu -o MPINeuralNet.out
+MPINeuralNet: MPINeuralNet.c
+	$(mpi) MPINeuralNet.c -o MPINeuralNet.out
 
 run:
 	# srun -N1 ./serialNeuralNet.out
