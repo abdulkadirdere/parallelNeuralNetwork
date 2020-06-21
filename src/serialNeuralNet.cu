@@ -54,11 +54,11 @@ double sigmoid(double  node){
 double *matrix_multiply_seq(double *a, double *b, double *ab, int row, int col){
 	for(int i=0; i<row; i++){
         for(int j=0; j<col; j++){
-            ab[i*col+j]=0.0;
+            ab[j]=0.0;
 			for(int k=0; k<row; k++){
-                ab[i*col+j] += a[i*row+k] * b[k*col+j];
+                ab[j] += a[k] * b[k*col+j];
             }
-            ab[i*col+j] = sigmoid(ab[i*col+j]);
+            ab[j] = sigmoid(ab[j]);
         }
     }
     return ab;
@@ -88,9 +88,9 @@ double *backprop_hidden(double *input_weights, double *hidden_weights, double *i
 
 double neural_net_seq(double actual){
     // initialisation
-    int num_input_nodes = 20; // number of input layer nodes
-    int num_hidden_nodes = 30; // number of hidden layer nodes
-    int num_output_nodes = 1;
+    int num_input_nodes = 512; // number of input layer nodes
+    int num_hidden_nodes = 1024; // number of hidden layer nodes
+    int num_output_nodes = 1; // number of output nodes
     int num_hidden_weights = num_input_nodes * num_hidden_nodes; // num of weights = num of input nodes x num of hidden nodes
     int num_output_weights = num_hidden_nodes * num_output_nodes;
 
@@ -130,6 +130,7 @@ double neural_net_seq(double actual){
 
 int main() {
     double actual = 1000;
+
     neural_net_seq(actual);
     return 0;
 }
