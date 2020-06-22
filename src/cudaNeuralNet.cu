@@ -141,8 +141,7 @@ double neural_net_seq(){
 
 __global__ void matrix_multiply_shared(double *input_A, double *input_B, double *output_AB, int width){
 
-    int row = blockIdx.y*blockDim.y + threadIdx.y;
-    printf("Device: %d ", row);
+    printf("Device");
 }
 
 
