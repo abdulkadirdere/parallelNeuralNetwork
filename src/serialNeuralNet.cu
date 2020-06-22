@@ -5,7 +5,8 @@
 #include <math.h>
 
 #define learning_rate 0.1
-#define epochs 100
+#define epochs 10
+#define actual 100
 
 int randomNumberGeneration(int upperBound, int lowerBound) {
     // creates a random integer within the bounds
@@ -64,7 +65,7 @@ double *matrix_multiply_seq(double *a, double *b, double *ab, int row, int col){
     return ab;
 }
 
-double error(double prediction, double actual){
+double error(double prediction){
     return (0.5 * pow((prediction - actual),2));
 }
 
@@ -86,7 +87,7 @@ double *backprop_hidden(double *input_weights, double *hidden_weights, double *i
     return input_weights;
 }
 
-double neural_net_seq(double actual){
+double neural_net_seq(){
     // initialisation
     int num_input_nodes = 512; // number of input layer nodes
     int num_hidden_nodes = 1024; // number of hidden layer nodes
@@ -119,9 +120,10 @@ double neural_net_seq(double actual){
         // printArray(h_hidden_weights, num_hidden_weights);
 
         // calculate the error
-        double error_value = error(predicted, actual);
-        printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
+        double error_value = error(predicted);
+        // printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
         if (error_value < 0.5){
+            printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
             break;
         }
     }
@@ -129,8 +131,20 @@ double neural_net_seq(double actual){
 }
 
 int main() {
-    double actual = 1000;
+    //-------------- Serial Neural Network --------------//
+    // CUDA timing of event
+    cudaEvent_t serial_start, serial_stop;
+    cudaEventCreate(&serial_start);
+    cudaEventCreate(&serial_stop);
 
-    neural_net_seq(actual);
+    cudaEventRecord(serial_start);
+    neural_net_seq();
+    cudaEventRecord(serial_stop);
+    cudaEventSynchronize(serial_stop);
+
+    float serial_time = 0;
+    cudaEventElapsedTime(&serial_time, serial_start, serial_stop);
+
+    printf("Serial Neural Network Time: %3.6f ms \n", serial_time);
     return 0;
 }
