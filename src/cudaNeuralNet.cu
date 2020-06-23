@@ -142,34 +142,29 @@ double *createWeights(int num_element) {
 
 __global__ void matrix_multiply_shared(double *input_A, double *input_B, double *output_AB, int height, int width){
 
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int tdi = blockIdx.x * blockDim.x + threadIdx.x;
 
-    float result = 0;
-    for(int k = 0; k < height; ++k){
-        result += input_A[row*width+k] * input_B[k*width+col];
-        // result += input_A[k] * input_B[k*width+col];
-
-        // A[0] * B[0] + A[1] * B[5] + A[2] * B[10] 
-        
-      }
-      // write out this thread's result
-      output_AB[col] = result;
-
-    // printf("Device: %3.4f \n", input_A[0]);
+    if (tdi < width){
+        double sum=0;
+        for(int k=0; k<height; k++){
+            sum = sum + (input_A[k] * input_B[k*width+tdi]);
+            // printf("AB: %f  %f   %f    %d   %d \n", sum, input_A[k], input_B[k*width+tdi], k, k*width+tdi);
+        }
+        output_AB[tdi] = 1/(1+exp(-1*sum));
+    }
 }
 
 double neural_net_cuda(){
     // initialisation
     int num_input_nodes = 2; // number of input layer nodes
-    int num_hidden_nodes = 3; // number of hidden layer nodes
+    int num_hidden_nodes = 3000; // number of hidden layer nodes
     int num_output_nodes = 1; // number of output nodes
     int num_hidden_weights = num_input_nodes * num_hidden_nodes; // num of weights = num of input nodes x num of hidden nodes
     int num_output_weights = num_hidden_nodes * num_output_nodes;
 
     // generate input nodes
     double *h_input_nodes = createArray(num_input_nodes);
-    printArray(h_input_nodes, num_input_nodes);
+    // printArray(h_input_nodes, num_input_nodes);
 
     // allocate memory for hidden_nodes and output nodes
     double *h_hidden_nodes = (double *)malloc(num_hidden_nodes * sizeof(double *));
@@ -198,14 +193,17 @@ double neural_net_cuda(){
     checkCudaErrors(cudaMemcpy(d_hidden_weights, h_hidden_weights, sizeof(double) * num_hidden_weights, cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMemcpy(d_output_weights, h_output_weights, sizeof(double) * num_output_weights, cudaMemcpyHostToDevice));
     
-    const dim3 block_size(BLOCK_SIZE,BLOCK_SIZE);
-    const dim3 num_blocks(num_input_nodes / block_size.x, num_input_nodes / block_size.y);
+    double threads = 1024;
+    int block = (num_hidden_nodes / 1024) + 1;
+
+    dim3 dimBlock(threads,1);
+    dim3 dimGrid(block,1);
 
     for (int epoch=0; epoch<epochs; epoch++){
-
-        matrix_multiply_shared<<<1, 10>>>(d_input_nodes, d_hidden_weights, d_hidden_nodes, num_input_nodes, num_hidden_nodes);
+        // thre
+        matrix_multiply_shared<<<dimGrid, dimBlock>>>(d_input_nodes, d_hidden_weights, d_hidden_nodes, num_input_nodes, num_hidden_nodes);
         checkCudaErrors(cudaMemcpy(h_hidden_nodes, d_hidden_nodes, sizeof(double) * num_hidden_nodes, cudaMemcpyDeviceToHost));
-        // printArray(h_hidden_nodes, num_hidden_nodes);
+        printArray(h_hidden_nodes, num_hidden_nodes);
         // copy from device to host
         // checkCudaErrors(cudaMemcpy(h_hidden_nodes, d_hidden_nodes, sizeof(double) * num_input_nodes, cudaMemcpyDeviceToHost));
         // printArray(h_hidden_nodes, num_hidden_nodes);
