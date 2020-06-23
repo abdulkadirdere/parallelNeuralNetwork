@@ -121,9 +121,9 @@ double neural_net_seq(){
 
         // calculate the error
         double error_value = error(predicted);
-        // printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
+        printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
         if (error_value < 0.5){
-            printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
+            // printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
             break;
         }
     }
