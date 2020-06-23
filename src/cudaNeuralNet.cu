@@ -161,8 +161,8 @@ __global__ void matrix_multiply_shared(double *input_A, double *input_B, double 
 
 double neural_net_cuda(){
     // initialisation
-    int num_input_nodes = 5; // number of input layer nodes
-    int num_hidden_nodes = 5; // number of hidden layer nodes
+    int num_input_nodes = 2; // number of input layer nodes
+    int num_hidden_nodes = 3; // number of hidden layer nodes
     int num_output_nodes = 1; // number of output nodes
     int num_hidden_weights = num_input_nodes * num_hidden_nodes; // num of weights = num of input nodes x num of hidden nodes
     int num_output_weights = num_hidden_nodes * num_output_nodes;
@@ -178,6 +178,7 @@ double neural_net_cuda(){
     // generate initial weights for hidden and output layer
     double *h_hidden_weights= createWeights(num_hidden_weights);
     double *h_output_weights= createWeights(num_output_weights);
+    // printArray(h_hidden_weights, num_hidden_weights);
 
     // allocate memory in device for input, hidden and output nodes
     double *d_input_nodes=0, *d_hidden_nodes=0, *d_output_nodes=0;
@@ -202,9 +203,9 @@ double neural_net_cuda(){
 
     for (int epoch=0; epoch<epochs; epoch++){
 
-        matrix_multiply_shared<<<num_blocks, block_size>>>(d_input_nodes, d_hidden_weights, d_hidden_nodes, num_input_nodes, num_hidden_nodes);
+        matrix_multiply_shared<<<1, 10>>>(d_input_nodes, d_hidden_weights, d_hidden_nodes, num_input_nodes, num_hidden_nodes);
         checkCudaErrors(cudaMemcpy(h_hidden_nodes, d_hidden_nodes, sizeof(double) * num_hidden_nodes, cudaMemcpyDeviceToHost));
-        printArray(h_hidden_nodes, num_hidden_nodes);
+        // printArray(h_hidden_nodes, num_hidden_nodes);
         // copy from device to host
         // checkCudaErrors(cudaMemcpy(h_hidden_nodes, d_hidden_nodes, sizeof(double) * num_input_nodes, cudaMemcpyDeviceToHost));
         // printArray(h_hidden_nodes, num_hidden_nodes);
