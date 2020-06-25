@@ -98,14 +98,7 @@ double *backprop_hidden(double *input_weights, double *hidden_weights, double *i
     return input_weights;
 }
 
-double neural_net_seq(){
-    // initialisation
-    int num_input_nodes = 512; // number of input layer nodes
-    int num_hidden_nodes = 1024; // number of hidden layer nodes
-    int num_output_nodes = 1; // number of output nodes
-    int num_hidden_weights = num_input_nodes * num_hidden_nodes; // num of weights = num of input nodes x num of hidden nodes
-    int num_output_weights = num_hidden_nodes * num_output_nodes;
-
+double neural_net_seq(int num_input_nodes, int num_hidden_nodes, int num_output_nodes, int num_hidden_weights, int num_output_weights){
     // generate input nodes
     double *h_input_nodes = createArray(num_input_nodes);
 
@@ -196,15 +189,9 @@ __global__ void backprop_hidden_kernel(double *layer1_weight, double *layer2_wei
 }
 
 
-double neural_net_cuda(){
+double neural_net_cuda(int num_input_nodes, int num_hidden_nodes, int num_output_nodes, int num_hidden_weights, int num_output_weights){
     // initialisation
-    int num_input_nodes = 512; // number of input layer nodes
-    int num_hidden_nodes = 1024; // number of hidden layer nodes
-    int num_output_nodes = 1; // number of output nodes
-    int num_hidden_weights = num_input_nodes * num_hidden_nodes; // num of weights = num of input nodes x num of hidden nodes
-    int num_output_weights = num_hidden_nodes * num_output_nodes;
     double learn_rate = learning_rate;
-
     cudaMemcpyToSymbol(c_learning_rate, &learn_rate, sizeof(double));
 
     // generate input nodes
@@ -301,6 +288,13 @@ double neural_net_cuda(){
 
 
 int main() {
+    // initialisation
+    int num_input_nodes = 512; // number of input layer nodes
+    int num_hidden_nodes = 1024; // number of hidden layer nodes
+    int num_output_nodes = 1; // number of output nodes
+    int num_hidden_weights = num_input_nodes * num_hidden_nodes; // num of weights = num of input nodes x num of hidden nodes
+    int num_output_weights = num_hidden_nodes * num_output_nodes;
+
     //-------------- Serial Neural Network --------------//
     // CUDA timing of event
     cudaEvent_t serial_start, serial_stop;
@@ -308,7 +302,7 @@ int main() {
     cudaEventCreate(&serial_stop);
 
     cudaEventRecord(serial_start);
-    neural_net_seq();
+    neural_net_seq(num_input_nodes, num_hidden_nodes, num_output_nodes, num_hidden_weights, num_output_weights);
     cudaEventRecord(serial_stop);
     cudaEventSynchronize(serial_stop);
 
@@ -322,7 +316,7 @@ int main() {
     cudaEventCreate(&cuda_stop);
 
     cudaEventRecord(cuda_start);
-    neural_net_cuda();
+    neural_net_cuda(num_input_nodes, num_hidden_nodes, num_output_nodes, num_hidden_weights, num_output_weights);
     cudaEventRecord(cuda_stop);
     cudaEventSynchronize(cuda_stop);
 
