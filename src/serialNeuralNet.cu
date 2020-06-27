@@ -87,14 +87,7 @@ double *backprop_hidden(double *input_weights, double *hidden_weights, double *i
     return input_weights;
 }
 
-double neural_net_seq(){
-    // initialisation
-    int num_input_nodes = 512; // number of input layer nodes
-    int num_hidden_nodes = 1024; // number of hidden layer nodes
-    int num_output_nodes = 1; // number of output nodes
-    int num_hidden_weights = num_input_nodes * num_hidden_nodes; // num of weights = num of input nodes x num of hidden nodes
-    int num_output_weights = num_hidden_nodes * num_output_nodes;
-
+double neural_net_seq(int num_input_nodes, int num_hidden_nodes, int num_output_nodes, int num_hidden_weights, int num_output_weights){
     // generate input nodes
     double *h_input_nodes = createArray(num_input_nodes);
 
@@ -105,6 +98,14 @@ double neural_net_seq(){
     // generate initial weights for hidden and output layer
     double *h_hidden_weights= createWeights(num_hidden_weights);
     double *h_output_weights= createWeights(num_output_weights);
+
+    //-------------- Serial Neural Network --------------//
+    // CUDA timing of event
+    cudaEvent_t serial_start, serial_stop;
+    cudaEventCreate(&serial_start);
+    cudaEventCreate(&serial_stop);
+
+    cudaEventRecord(serial_start);
 
     for (int epoch=0; epoch<epochs; epoch++){
         // matrix multiplication hidden layer
@@ -121,29 +122,38 @@ double neural_net_seq(){
 
         // calculate the error
         double error_value = error(predicted);
-        printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
-        if (error_value < 0.5){
-            // printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
+        // printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
+        if (error_value < 1){
+            printf("Epoch:%d - Error:%3.4f  - Predicted:%3.4f \n", epoch, error_value, predicted);
             break;
         }
     }
-    return 0;
-}
 
-int main() {
-    //-------------- Serial Neural Network --------------//
-    // CUDA timing of event
-    cudaEvent_t serial_start, serial_stop;
-    cudaEventCreate(&serial_start);
-    cudaEventCreate(&serial_stop);
-
-    cudaEventRecord(serial_start);
-    neural_net_seq();
     cudaEventRecord(serial_stop);
     cudaEventSynchronize(serial_stop);
 
     float serial_time = 0;
     cudaEventElapsedTime(&serial_time, serial_start, serial_stop);
+
+    //-------------- Free Memory --------------//
+    free(h_input_nodes);
+    free(h_hidden_weights);
+    free(h_hidden_nodes);
+    free(h_output_weights);
+    free(h_output_nodes);
+
+    return serial_time;
+}
+
+int main() {
+    // initialisation
+    int num_input_nodes = 512; // number of input layer nodes
+    int num_hidden_nodes = 1024; // number of hidden layer nodes
+    int num_output_nodes = 1; // number of output nodes
+    int num_hidden_weights = num_input_nodes * num_hidden_nodes; // num of weights = num of input nodes x num of hidden nodes
+    int num_output_weights = num_hidden_nodes * num_output_nodes;
+
+    double serial_time = neural_net_seq(num_input_nodes, num_hidden_nodes, num_output_nodes, num_hidden_weights, num_output_weights);
 
     printf("Serial Neural Network Time: %3.6f ms \n", serial_time);
     return 0;

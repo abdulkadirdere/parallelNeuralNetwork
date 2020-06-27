@@ -13,6 +13,8 @@ cudaNeuralNet: cudaNeuralNet.cu
 
 MPINeuralNet: MPINeuralNet.c
 	$(mpi) MPINeuralNet.c -o MPINeuralNet.out
+	# mpirun -use-hwthread-cpus ./MPINeuralNet.out
+	mpirun -n 1 ./MPINeuralNet.out
 
 run:
 	# srun -N1 ./serialNeuralNet.out
