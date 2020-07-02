@@ -50,24 +50,21 @@ double *createWeights(int num_element) {
 
 int main(int argc, char **argv){
 
-    int my_rank, comm_sz;
+    int process_rank, comm_size;
     MPI_Comm comm;
 
     MPI_Init(NULL, NULL);
     comm = MPI_COMM_WORLD;
-    MPI_Comm_size(comm, &comm_sz);
-    MPI_Comm_rank(comm, &my_rank);
+    MPI_Comm_size(comm, &comm_size);
+    MPI_Comm_rank(comm, &process_rank);
 
     int num_input_nodes = 4; // number of input layer nodes
     int num_hidden_nodes = 4; // number of hidden layer nodes
     int num_output_nodes = 1; // number of output nodes
+
     int num_hidden_weights = num_input_nodes * num_hidden_nodes; // num of weights = num of input nodes x num of hidden nodes
     int num_output_weights = num_hidden_nodes * num_output_nodes;
-    int send_receive = num_input_nodes;
 
-    double *local_A = malloc(send_receive * sizeof(double));
-
-    // // generate input nodes
     double *h_input_nodes;
     // allocate memory for hidden_nodes and output nodes
     double *h_hidden_nodes;
@@ -76,7 +73,7 @@ int main(int argc, char **argv){
     double *h_hidden_weights;
     double *h_output_weights;
 
-    if (my_rank == 0){
+    if (process_rank == 0){
         // // generate input nodes
         h_input_nodes = createArray(num_input_nodes);
 
@@ -87,15 +84,24 @@ int main(int argc, char **argv){
         // // generate initial weights for hidden and output layer
         h_hidden_weights= createWeights(num_hidden_weights);
         h_output_weights= createWeights(num_output_weights);
+
         printf("\n");
         printArray(h_hidden_weights, num_hidden_weights);
+        printArray(h_input_nodes, num_input_nodes);
+
     }
+    MPI_Barrier(comm);
+    int rows_per_process = (num_hidden_nodes/comm_size) + 1;
 
-    MPI_Scatter(h_hidden_weights, send_receive, MPI_DOUBLE, local_A, send_receive, MPI_DOUBLE, 0, comm);
+    double *local_row = malloc((rows_per_process*num_hidden_nodes) * sizeof(double));
+    // double *local_input_node = malloc(num_input_nodes * sizeof(double));
 
+    MPI_Scatter(h_hidden_weights, 2, MPI_DOUBLE, local_row, 2, MPI_DOUBLE, 0, comm);
+    // MPI_Allgather(h_input_nodes, num_input_nodes, MPI_DOUBLE, local_input_node, num_input_nodes, MPI_DOUBLE, comm);
+    // MPI_Bcast(&j, 1, MPI_INT, 0, comm);
 
-    printf("\nProcess Number: %d\n", my_rank);
-    printf("\nValue in local_A: %f\n", local_A[0]);
+    printf("\nProcess Number: %d\n", process_rank);
+    printf("%f", local_row[0]);
 
     MPI_Finalize(); 
 
