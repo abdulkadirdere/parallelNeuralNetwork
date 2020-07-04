@@ -166,9 +166,9 @@ void main(int argc, char *argv[]) {
     createVector("Input Node", input_nodes, num_input_nodes, rank, comm);
     printArray("Input Node", input_nodes, num_input_nodes, rank, comm);
 
-    // // multiply input nodes with layer 1 weights to find hidden node values
-    // matrix_multiply_mpi(local_hidden_weights, local_input_nodes, local_hidden_nodes, rows_per_process_l1, col_l1, columns_per_process_l1, comm);
-    // printArray("Matrix Multiplication",local_hidden_nodes, col_l1, columns_per_process_l1, rank, comm);
+    // multiply input nodes with layer 1 weights to find hidden node values
+    matrix_multiply_mpi(local_hidden_weights, local_input_nodes, local_hidden_nodes, rows_per_process_l1, col_l1, columns_per_process_l1, comm);
+    printArray("Matrix Multiplication",local_hidden_nodes, col_l1, columns_per_process_l1, rank, comm);
 
 
     // hidden_nodes = gatherArray(local_hidden_nodes, row, rows_per_process, rank, comm);
