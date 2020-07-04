@@ -24,7 +24,7 @@ void printMatrix(char prompt[], double local_A[], int col, int columns_per_proce
 }
 
 void printArray(char prompt[], double local_array[], int col, int rank, MPI_Comm comm) {
-    if (rank == 2) {
+    if (rank == 0) {
         printf("\n%s Vector: \n", prompt);
         for (int i = 0; i < col; i++) {
             printf("%f ", local_array[i]);
@@ -33,9 +33,10 @@ void printArray(char prompt[], double local_array[], int col, int rank, MPI_Comm
     }
 }
 
-void allocateArrays(double **local_hidden_weights, double **input_nodes, double **local_hidden_nodes, double **local_output_nodes, int num_input_nodes, int columns_per_process, int num_output_nodes, MPI_Comm comm) {
+void allocateArrays(double **local_hidden_weights, double **hidden_nodes, double **input_nodes, double **local_hidden_nodes, double **local_output_nodes, int num_input_nodes, int columns_per_process, int num_output_nodes, int num_hidden_nodes,MPI_Comm comm) {
     *local_hidden_weights = malloc(columns_per_process * num_input_nodes * sizeof(double));
     *input_nodes = malloc(num_input_nodes * sizeof(double));
+    *hidden_nodes = malloc(num_hidden_nodes * sizeof(double));
     *local_hidden_nodes = malloc(columns_per_process * sizeof(double));
     *local_output_nodes = malloc(num_output_nodes * sizeof(double));
 }
@@ -99,21 +100,17 @@ void matrix_multiply_mpi(double local_a[], double local_b[], double local_ab[], 
     }
 }
 
-double *gatherArray(double local_array[], int col, int columns_per_process, int rank, MPI_Comm comm) {
-    double *array = NULL;
-
+void *gatherArray(double output[], double local_array[], int rows, int columns_per_process, int rank, int num_process, MPI_Comm comm) {
     if (rank == 0) {
-        array = malloc(col * sizeof(double));
-
-        MPI_Gather(local_array, columns_per_process, MPI_DOUBLE, array, columns_per_process, MPI_DOUBLE, 0, comm);
-        for (int i = 0; i < col; i++) {
-            array[i*col] = array[i];
-        }
+        // array = malloc((columns_per_process*num_process) * sizeof(double));
+        MPI_Gather(local_array, columns_per_process, MPI_DOUBLE, output, columns_per_process, MPI_DOUBLE, 0, comm);
+        // for (int i = 0; i < rows; i++) {
+        //     array[i*row] = array[i];
+        // }
         // free(array);
     } else {
-        MPI_Gather(local_array, columns_per_process, MPI_DOUBLE, array, columns_per_process, MPI_DOUBLE, 0, comm);
+        MPI_Gather(local_array, columns_per_process, MPI_DOUBLE, NULL, columns_per_process, MPI_DOUBLE, 0, comm);
     }
-    return  array;
 }
 
 void printResult(double *array, int width) {
@@ -156,7 +153,7 @@ void main(int argc, char *argv[]) {
     rows_per_process_l2 = row_l2 / comm_size;
     columns_per_process_l2 = num_output_nodes;
 
-    allocateArrays(&local_hidden_weights, &input_nodes, &local_hidden_nodes, &local_output_nodes, num_input_nodes, columns_per_process_l1, num_output_nodes, comm);
+    allocateArrays(&local_hidden_weights, &hidden_nodes, &input_nodes, &local_hidden_nodes, &local_output_nodes, num_input_nodes, columns_per_process_l1, num_output_nodes, num_hidden_nodes,comm);
 
     // create layer 1 weights data
     createMatrix("Layer 1 Weights", local_hidden_weights, num_hidden_nodes, columns_per_process_l1, num_input_nodes, rank, comm);
@@ -171,6 +168,7 @@ void main(int argc, char *argv[]) {
     matrix_multiply_mpi(local_hidden_weights, input_nodes, local_hidden_nodes, num_input_nodes, num_hidden_nodes, columns_per_process_l1, comm, rank);
     printArray("LHN", local_hidden_nodes, columns_per_process_l1*num_input_nodes, rank, comm);
 
+    gatherArray(hidden_nodes, local_hidden_nodes, num_input_nodes, num_hidden_nodes, rank, comm_size,comm);
 
 
     if (rank==0){
