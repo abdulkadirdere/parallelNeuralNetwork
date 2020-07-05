@@ -100,16 +100,11 @@ void matrix_multiply_mpi(double local_a[], double local_b[], double local_ab[], 
     }
 }
 
-void *gatherArray(double output[], double local_array[], int rows, int columns_per_process, int rank, int num_process, MPI_Comm comm) {
+void *gatherArray(double output[], double local_array[], int columns_per_process, int rank, MPI_Comm comm) {
     if (rank == 0) {
-        // array = malloc((columns_per_process*num_process) * sizeof(double));
-        MPI_Gather(local_array, columns_per_process, MPI_DOUBLE, output, columns_per_process, MPI_DOUBLE, 0, comm);
-        // for (int i = 0; i < rows; i++) {
-        //     array[i*row] = array[i];
-        // }
-        // free(array);
+        MPI_Gather(local_array, columns_per_process, MPI_DOUBLE, output, columns_per_process, MPI_DOUBLE, rank, comm);
     } else {
-        MPI_Gather(local_array, columns_per_process, MPI_DOUBLE, NULL, columns_per_process, MPI_DOUBLE, 0, comm);
+        MPI_Gather(local_array, columns_per_process, MPI_DOUBLE, NULL, columns_per_process, MPI_DOUBLE, rank, comm);
     }
 }
 
@@ -153,38 +148,37 @@ void main(int argc, char *argv[]) {
     rows_per_process_l2 = row_l2 / comm_size;
     columns_per_process_l2 = num_output_nodes;
 
+    // Allocate space for various arrays
     allocateArrays(&local_hidden_weights, &hidden_nodes, &input_nodes, &local_hidden_nodes, &local_output_nodes, num_input_nodes, columns_per_process_l1, num_output_nodes, num_hidden_nodes,comm);
 
-    // create layer 1 weights data
+    // Create Layer 1 Weights Data
     createMatrix("Layer 1 Weights", local_hidden_weights, num_hidden_nodes, columns_per_process_l1, num_input_nodes, rank, comm);
-    printMatrix("Layer 1 Weights", local_hidden_weights, num_hidden_nodes, columns_per_process_l1, num_input_nodes, rank, comm_size,comm);
 
+    //Create a Random Vector for the input nodes
     createVector("Input Node", input_nodes, num_input_nodes, rank, comm);
-    printArray("Input Node", input_nodes, num_input_nodes, rank, comm);
 
+    //Wait for all threads to complete before performing matrix multiplication
     MPI_Barrier(comm);
 
-    // multiply input nodes with layer 1 weights to find hidden node values
+    // Multiply input nodes with layer 1 weights to find hidden node values
     matrix_multiply_mpi(local_hidden_weights, input_nodes, local_hidden_nodes, num_input_nodes, num_hidden_nodes, columns_per_process_l1, comm, rank);
-    printArray("LHN", local_hidden_nodes, columns_per_process_l1*num_input_nodes, rank, comm);
 
-    gatherArray(hidden_nodes, local_hidden_nodes, num_input_nodes, num_hidden_nodes, rank, comm_size,comm);
+    // Temp store all gathered hidden nodes in process Rank 0
+    double *temp_hidden_nodes = malloc(columns_per_process_l1*num_hidden_nodes * sizeof(double));
+    gatherArray(temp_hidden_nodes, local_hidden_nodes, columns_per_process_l1, 0, comm);
 
-
+    //Collect all hidden node final values in Rank 0 process
     if (rank==0){
-        printf("\nRank: %d\n", rank);
-        printf("Cols Per Process: %d\n", columns_per_process_l1);
-        for(int i = 0; i<columns_per_process_l1*num_input_nodes;i++){
-            printf("weights: %f \n", local_hidden_weights[i]);
+        printf("\nPrinting From Rank: %d\n", rank);
+        // printf("Cols Per Process: %d\n", columns_per_process_l1);
+        // for(int i = 0; i<columns_per_process_l1*num_input_nodes;i++){
+        //     printf("weights: %f \n", local_hidden_weights[i]);
+        // }
+        for(int j = 0; j<num_hidden_nodes;j++){
+            hidden_nodes[j] = temp_hidden_nodes[j];
+            printf("Test HW ON Rq %d : %f\n", j, hidden_nodes[j]);
         }
     }
-
-    // createVector("Layer 2 Weights", local_output_weights, col, columns_per_process, rank, comm);
-    // printArray("Layer 2 Weights", local_output_weights, col, columns_per_process, rank, comm);
-    
-    // matrix_multiply_mpi(local_output_weights, local_hidden_nodes, local_output_nodes, num_hidden_nodes/comm_size, num_output_nodes, num_output_nodes/comm_size, comm);
-    // // printf("local_hidden_nodes: %f \n", local_output_nodes[0]);
-    // printArray("Matrix Multiplication 2",local_output_nodes, row, rows_per_process, rank, comm);
 
 
     MPI_Finalize();
