@@ -33,10 +33,12 @@ void printArray(char prompt[], double local_array[], int col, int rank, MPI_Comm
     }
 }
 
-void allocateArrays(double **local_hidden_weights, double **hidden_nodes, double **input_nodes, double **local_hidden_nodes, double **local_output_nodes, int num_input_nodes, int columns_per_process, int num_output_nodes, int num_hidden_nodes,MPI_Comm comm) {
+void allocateArrays(double **local_hidden_weights, double** output_weights, double **output_nodes, double **hidden_nodes, double **input_nodes, double **local_hidden_nodes, double **local_output_nodes, int num_input_nodes, int columns_per_process, int num_output_nodes, int num_hidden_nodes,MPI_Comm comm) {
     *local_hidden_weights = malloc(columns_per_process * num_input_nodes * sizeof(double));
     *input_nodes = malloc(num_input_nodes * sizeof(double));
     *hidden_nodes = malloc(num_hidden_nodes * sizeof(double));
+    *output_nodes = malloc(num_output_nodes * sizeof(double));
+    *output_weights = malloc(num_hidden_nodes * sizeof(double));
     *local_hidden_nodes = malloc(columns_per_process * sizeof(double));
     *local_output_nodes = malloc(num_output_nodes * sizeof(double));
 }
@@ -126,15 +128,25 @@ double *matrix_multiply_seq(double *a, double *b, double *ab, int row, int col){
     return ab;
 }
 
+double *matrix_multiplication_2(double *a, double *b, double *ab, int num_hidden_nodes, int nodes_available){
+    ab[0] = 0;
+    for(int j = 0; j<num_hidden_nodes/nodes_available; j++){
+        ab[0] += a[j] * b[j];
+    }    
+}
+
 void main(int argc, char *argv[]) {
-    int num_input_nodes = 512;                                      // number of input layer nodes - columns
-    int num_hidden_nodes = 1024;                                     // number of hidden layer nodes - rows
+
+    int num_input_nodes = 300;                                      // number of input layer nodes - columns
+    int num_hidden_nodes = 500;                                     // number of hidden layer nodes - rows
     int num_output_nodes = 1;                                     // number of output nodes
+
     int num_hidden_weights = num_input_nodes * num_hidden_nodes;  // num of weights = num of input nodes x num of hidden nodes
     int num_output_weights = num_hidden_nodes * num_output_nodes;
 
     double *local_hidden_weights;
     double *local_output_weights;
+    double *output_weights;
 
     double *local_hidden_nodes;
     double *local_output_nodes;
@@ -143,7 +155,8 @@ void main(int argc, char *argv[]) {
     double *hidden_nodes;
     double *output_nodes;
 
-    int row_l1, rows_per_process_l1, col_l1, columns_per_process_l1, columns_per_process_l2;
+    // int columns_per_process_l1, columns_per_process_l2;
+
     int rank, comm_size;
     MPI_Comm comm;
 
@@ -152,11 +165,11 @@ void main(int argc, char *argv[]) {
     MPI_Comm_size(comm, &comm_size);
     MPI_Comm_rank(comm, &rank);
 
-    columns_per_process_l1 = num_hidden_nodes / comm_size+1;
-    columns_per_process_l2 = num_output_nodes;
+    int columns_per_process_l1 = (num_hidden_nodes/comm_size)+1;
+    int nodes_available = (num_hidden_nodes/comm_size)+1;
 
     // Allocate space for various arrays
-    allocateArrays(&local_hidden_weights, &hidden_nodes, &input_nodes, &local_hidden_nodes, &local_output_nodes, num_input_nodes, columns_per_process_l1, num_output_nodes, num_hidden_nodes,comm);
+    allocateArrays(&local_hidden_weights, &output_weights,&output_nodes, &hidden_nodes, &input_nodes, &local_hidden_nodes, &local_output_nodes, num_input_nodes, columns_per_process_l1, num_output_nodes, num_hidden_nodes,comm);
     // Create Layer 1 Weights Data
     createMatrix("Layer 1 Weights", local_hidden_weights, num_hidden_nodes, columns_per_process_l1, num_input_nodes, rank, comm);
     //Create a Random Vector for the input nodes
@@ -176,18 +189,33 @@ void main(int argc, char *argv[]) {
             hidden_nodes[j] = temp_hidden_nodes[j];
             // printf("Test HW ON Rq %d : %f\n", j, hidden_nodes[j]);
         }
-
         // Create weights for the layer 2 hidden nodes
-        createVector("Output Weights", local_output_weights, num_hidden_nodes, rank, comm);
+        createVector("Output Weights", output_weights, num_hidden_nodes, rank, comm);
+        // matrix_multiply_seq(hidden_nodes, output_weights, output_nodes, num_hidden_nodes, num_output_nodes);
+        // printf("\nSeq Output Node: %f", output_nodes[0]);
+    }
 
-        for(int j = 0; j<num_hidden_nodes;j++){
-            printf("Test HW%d : %f\n", j, local_output_weights[j]);
-        }
+    MPI_Barrier(comm);
 
-        matrix_multiply_seq(local_hidden_nodes, local_output_weights, local_output_nodes, num_hidden_nodes, num_output_nodes);
+    // Scatter hidden nodes to all child nodes
+    MPI_Scatter(hidden_nodes, nodes_available, MPI_DOUBLE, local_hidden_nodes, nodes_available, MPI_DOUBLE, 0, comm);
+    // Scatter L2 weights to all child nodes
+    MPI_Scatter(output_weights, nodes_available, MPI_DOUBLE, local_output_weights, nodes_available, MPI_DOUBLE, 0, comm);
 
-        printf("\nOutput Node: %f", local_output_nodes[0]);
- 
+    MPI_Barrier(comm);
+
+    matrix_multiplication_2(local_hidden_nodes, local_output_weights, local_output_nodes, num_hidden_nodes, nodes_available);
+
+    MPI_Barrier(comm);
+
+    MPI_Reduce(local_output_nodes, output_nodes, 1, MPI_DOUBLE, MPI_SUM, 0, comm);
+
+    MPI_Barrier(comm);
+
+    
+
+    if (rank == 0) {
+        printf("\nParallel Output Node: %f", output_nodes[0]);
     }
 
     MPI_Finalize();
