@@ -55,7 +55,6 @@ void createMatrix(char prompt[], double local_a[], int col, int columns_per_proc
             }
         }
         MPI_Scatter(A, columns_per_process * row, MPI_DOUBLE, local_a, columns_per_process * row, MPI_DOUBLE, 0, comm);
-        // free(A);
     } else {
         MPI_Scatter(A, columns_per_process * row, MPI_DOUBLE, local_a, columns_per_process * row, MPI_DOUBLE, 0, comm);
     }
@@ -72,7 +71,6 @@ void createVector(char prompt[], double local_b[], int col, int rank, MPI_Comm c
             local_b[i] = (rand() % (upperBound - lowerBound + 1)) + lowerBound;
         }
     }
- 
     MPI_Bcast(local_b, col, MPI_DOUBLE, 0, comm);
 }
 
@@ -115,9 +113,22 @@ void printResult(double *array, int width) {
     printf("\n");
 }
 
+double *matrix_multiply_seq(double *a, double *b, double *ab, int row, int col){
+	for(int i=0; i<row; i++){
+        for(int j=0; j<col; j++){
+            ab[j]=0.0;
+			for(int k=0; k<row; k++){
+                ab[j] += a[k] * b[k*col+j];
+            }
+            // ab[j] = sigmoid(ab[j]);
+        }
+    }
+    return ab;
+}
+
 void main(int argc, char *argv[]) {
-    int num_input_nodes = 3;                                      // number of input layer nodes - columns
-    int num_hidden_nodes = 5;                                     // number of hidden layer nodes - rows
+    int num_input_nodes = 512;                                      // number of input layer nodes - columns
+    int num_hidden_nodes = 1024;                                     // number of hidden layer nodes - rows
     int num_output_nodes = 1;                                     // number of output nodes
     int num_hidden_weights = num_input_nodes * num_hidden_nodes;  // num of weights = num of input nodes x num of hidden nodes
     int num_output_weights = num_hidden_nodes * num_output_nodes;
@@ -132,7 +143,7 @@ void main(int argc, char *argv[]) {
     double *hidden_nodes;
     double *output_nodes;
 
-    int row_l1, rows_per_process_l1, col_l1, columns_per_process_l1, row_l2, rows_per_process_l2, col_l2, columns_per_process_l2;
+    int row_l1, rows_per_process_l1, col_l1, columns_per_process_l1, columns_per_process_l2;
     int rank, comm_size;
     MPI_Comm comm;
 
@@ -142,44 +153,42 @@ void main(int argc, char *argv[]) {
     MPI_Comm_rank(comm, &rank);
 
     columns_per_process_l1 = num_hidden_nodes / comm_size+1;
-
-    row_l2 = num_hidden_nodes;
-    col_l2 = num_output_nodes;
-    rows_per_process_l2 = row_l2 / comm_size;
     columns_per_process_l2 = num_output_nodes;
 
     // Allocate space for various arrays
     allocateArrays(&local_hidden_weights, &hidden_nodes, &input_nodes, &local_hidden_nodes, &local_output_nodes, num_input_nodes, columns_per_process_l1, num_output_nodes, num_hidden_nodes,comm);
-
     // Create Layer 1 Weights Data
     createMatrix("Layer 1 Weights", local_hidden_weights, num_hidden_nodes, columns_per_process_l1, num_input_nodes, rank, comm);
-
     //Create a Random Vector for the input nodes
     createVector("Input Node", input_nodes, num_input_nodes, rank, comm);
-
     //Wait for all threads to complete before performing matrix multiplication
     MPI_Barrier(comm);
-
     // Multiply input nodes with layer 1 weights to find hidden node values
     matrix_multiply_mpi(local_hidden_weights, input_nodes, local_hidden_nodes, num_input_nodes, num_hidden_nodes, columns_per_process_l1, comm, rank);
-
     // Temp store all gathered hidden nodes in process Rank 0
     double *temp_hidden_nodes = malloc(columns_per_process_l1*num_hidden_nodes * sizeof(double));
     gatherArray(temp_hidden_nodes, local_hidden_nodes, columns_per_process_l1, 0, comm);
 
-    //Collect all hidden node final values in Rank 0 process
+    MPI_Barrier(comm);
+    // Collect all hidden node final values in Rank 0 process
     if (rank==0){
-        printf("\nPrinting From Rank: %d\n", rank);
-        // printf("Cols Per Process: %d\n", columns_per_process_l1);
-        // for(int i = 0; i<columns_per_process_l1*num_input_nodes;i++){
-        //     printf("weights: %f \n", local_hidden_weights[i]);
-        // }
         for(int j = 0; j<num_hidden_nodes;j++){
             hidden_nodes[j] = temp_hidden_nodes[j];
-            printf("Test HW ON Rq %d : %f\n", j, hidden_nodes[j]);
+            // printf("Test HW ON Rq %d : %f\n", j, hidden_nodes[j]);
         }
-    }
 
+        // Create weights for the layer 2 hidden nodes
+        createVector("Output Weights", local_output_weights, num_hidden_nodes, rank, comm);
+
+        for(int j = 0; j<num_hidden_nodes;j++){
+            printf("Test HW%d : %f\n", j, local_output_weights[j]);
+        }
+
+        matrix_multiply_seq(local_hidden_nodes, local_output_weights, local_output_nodes, num_hidden_nodes, num_output_nodes);
+
+        printf("\nOutput Node: %f", local_output_nodes[0]);
+ 
+    }
 
     MPI_Finalize();
 }
